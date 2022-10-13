@@ -1,5 +1,5 @@
-CFLAGS = -O2 -Wall
-objects = main.o
+CFLAGS = -O2 -Wall -Werror -pedantic -std=c99
+objects = panel-info-memory.o
 target = rc-panel-info-memory
 
 %.o : %.c
