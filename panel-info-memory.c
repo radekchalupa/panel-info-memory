@@ -5,16 +5,27 @@
  * -l[label] vlastni nadpis
  * -p vypis v procentech
  */ 
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdint.h>
 #include <getopt.h>
+#include <string.h>
 
 #define MAX_LABEL_LENGTH 32
-#define OUTPUT_PCT 'p'
-#define OUTPUT_VALUE 'v'
+#define MEMORY_INFO_PERCENT 1
+#define MEMORY_INFO_VERBOSE 1 << 2
 
-static int print_output(char* szlabel, char argoutput, int verbose)
+static void show_help(void)
+{
+	puts("parametry:");
+	puts("  -p	zobrazi hodnoty v procentech");
+	puts("  -v	podrobnejsi vypis");
+	puts("  -s	kratky vypis");
+	puts("  -l <nadpis>");
+}
+
+int print_output(const char* szlabel, uint_fast32_t params)
 {
 	FILE* pfile = fopen("/proc/meminfo", "r");
 	if (NULL == pfile)
@@ -55,55 +66,68 @@ static int print_output(char* szlabel, char argoutput, int verbose)
 	}
 	fclose(pfile);
 	char sztext[32];
-	char szoutput[64 + MAX_LABEL_LENGTH];
+	char outbuff[64 + MAX_LABEL_LENGTH];
 	*sztext = 0;
-	*szoutput = 0;
+	*outbuff = 0;
 	if (szlabel)
-		strcat(szoutput, szlabel);
-	if (OUTPUT_PCT == argoutput)
+	{
+		strcat(outbuff, szlabel);
+		strcat(outbuff, " ");
+	}
+	if (MEMORY_INFO_PERCENT & params)
+	{
 		sprintf(sztext, "%u", 100*(mem_total - mem_avail) / mem_total);
+		strcat(sztext, "%");
+	}
 	else
-		sprintf(sztext, verbose ? "%.2f GiB" :  "%.2fG",
+		sprintf(sztext, (MEMORY_INFO_VERBOSE & params) ? "%.2f GiB" :  "%.2fG",
 			(double)(mem_total - mem_avail) / (1024 * 1024));
-	strcat(szoutput, sztext);
-	if (OUTPUT_PCT == argoutput)
+	strcat(outbuff, sztext);
+	if (MEMORY_INFO_PERCENT & params)
+	{
 		sprintf(sztext, " - %u", 100*(swap_total - swap_free) / swap_total);
+		strcat(sztext, "%");
+	}
 	else
-		sprintf(sztext, verbose ? " - %.2f GiB" : "-%.2fG",
+		sprintf(sztext, (MEMORY_INFO_VERBOSE & params) ? " - %.2f GiB" : " - %.2fG",
 			(double)(swap_total - swap_free) / (1024 * 1024));
-	strcat(szoutput, sztext);
-	puts(szoutput);
+	strcat(outbuff, sztext);
+	puts(outbuff);
 	return EXIT_SUCCESS;
 }
 
 int main(int argc, char** argv)
 {
 	int opt;
-	char szlabel[MAX_LABEL_LENGTH + 1];
+	uint_fast32_t params = 0;
+	char szlabel[MAX_LABEL_LENGTH];
 	*szlabel = 0;
-	char argoutput = OUTPUT_VALUE;
-	int verbose = 1;
 	if (argc > 1)
 	{
-		while ((opt = getopt(argc, argv, "vspl:")) != -1)
+		while ((opt = getopt(argc, argv, "vsphl:")) != -1)
 		{
 			switch (opt)
 			{
 			case 'l':
-				if (strlen(optarg) <= MAX_LABEL_LENGTH)
+				if (strlen(optarg) <= sizeof(szlabel) - 1)
 					strcpy(szlabel, optarg);
 				break;
 			case 'p':
-				argoutput = OUTPUT_PCT;
+				params |= MEMORY_INFO_PERCENT;
 				break;
 			case 's':
-				verbose = 0;
+				params &= ~MEMORY_INFO_VERBOSE;
 				break;
 			case 'v':
-				verbose = 1;
+				params |= MEMORY_INFO_VERBOSE;
+				break;
+			case 'h':
+				show_help();
+				return EXIT_SUCCESS;
 				break;
 			}
 		}
 	}
-	return print_output(szlabel, argoutput, verbose);
+	return print_output(szlabel, params);
 }
+
